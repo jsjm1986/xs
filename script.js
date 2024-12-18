@@ -65,9 +65,11 @@ let currentNovel = {
 
 // 文字动画配置
 const TEXT_ANIMATION = {
-    streamDelay: 20,  // 每个字符的延迟（毫秒）
-    chunkSize: 5,     // 每次添加的字符数
-    punctuationPause: 150  // 标点符号后的停顿（毫秒）
+    streamDelay: 15,         // 每个字符的延迟（毫秒）
+    chunkSize: 3,           // 每次添加的字符数
+    punctuationPause: 200,  // 标点符号后的停顿（毫秒）
+    paragraphPause: 500,    // 段落之间的停顿（毫秒）
+    chapterPause: 1000      // 章节之间的停顿（毫秒）
 };
 
 // 大纲生成相关配置
@@ -89,6 +91,266 @@ const OUTLINE_CONFIG = {
         "结局是否合理"
     ]
 };
+
+// 添加自动保存相关配置
+const AUTOSAVE_CONFIG = {
+    interval: 30000, // 自动保存间隔（毫秒）
+    maxSaves: 5,     // 最大保存数量
+    prefix: 'novel_autosave_' // 存储键前缀
+};
+
+// 自动保存定时器
+let autosaveTimer;
+
+// 初始化自动保存功能
+function initAutosave() {
+    // 加载上次的自动保存
+    loadLastAutosave();
+    
+    // 启动自动保存定时器
+    autosaveTimer = setInterval(autoSaveNovel, AUTOSAVE_CONFIG.interval);
+    
+    // 添加页面关闭前的保存
+    window.addEventListener('beforeunload', (e) => {
+        autoSaveNovel();
+    });
+}
+
+// 自动保存小说内容
+function autoSaveNovel() {
+    try {
+        // 获取当前所有设置和内容
+        const saveData = {
+            timestamp: new Date().getTime(),
+            novel: currentNovel,
+            settings: getAllSettings(),
+            progress: {
+                currentStep: currentNovel.currentStep,
+                totalWords: currentNovel.totalWords,
+                generatedChapters: currentNovel.generatedChapters
+            }
+        };
+
+        // 压缩数据
+        const compressedData = compressData(saveData);
+        
+        // 获取现有保存
+        const saves = getSavedNovels();
+        saves.unshift(compressedData);
+        
+        // 限制保存数量
+        while (saves.length > AUTOSAVE_CONFIG.maxSaves) {
+            saves.pop();
+        }
+        
+        // 保存到本地存储
+        localStorage.setItem('novel_autosaves', JSON.stringify(saves));
+        
+        // 更新状态提示
+        updateAutosaveStatus('已自动保存', 'success');
+        
+        // 更新统计信息
+        updateSaveStats();
+    } catch (error) {
+        console.error('自动保存失败:', error);
+        updateAutosaveStatus('自动保存失败', 'error');
+    }
+}
+
+// 获取所有当前设置
+function getAllSettings() {
+    return {
+        title: document.getElementById('novelTitle').value,
+        plotIdea: document.getElementById('plotIdea').value,
+        novelType: document.getElementById('novelType').value,
+        writeStyle: document.getElementById('writeStyle').value,
+        chapterCount: document.getElementById('chapterCount').value,
+        chapterLength: document.getElementById('chapterLength').value,
+        characterComplexity: document.getElementById('characterComplexity').value,
+        plotComplexity: document.getElementById('plotComplexity').value,
+        narrativePerspective: document.getElementById('narrativePerspective').value,
+        perspectiveChange: document.getElementById('perspectiveChange').value,
+        detailLevel: document.getElementById('detailLevel').value,
+        dialogueRatio: document.getElementById('dialogueRatio').value,
+        emotionalTone: document.getElementById('emotionalTone').value,
+        emotionalChange: document.getElementById('emotionalChange').value,
+        timeBackground: document.getElementById('timeBackground').value,
+        geography: document.getElementById('geography').value,
+        languageStyle: document.getElementById('languageStyle').value,
+        paragraphLength: document.getElementById('paragraphLength').value,
+        rhetoricLevel: document.getElementById('rhetoricLevel').value,
+        specialElements: {
+            hasRomance: document.getElementById('hasRomance').checked,
+            hasConflict: document.getElementById('hasConflict').checked,
+            hasMystery: document.getElementById('hasMystery').checked,
+            hasHumor: document.getElementById('hasHumor').checked
+        },
+        worldElements: {
+            hasMagic: document.getElementById('hasMagic').checked,
+            hasTechnology: document.getElementById('hasTechnology').checked,
+            hasReligion: document.getElementById('hasReligion').checked,
+            hasPolitics: document.getElementById('hasPolitics').checked
+        }
+    };
+}
+
+// 加载设置到界面
+function loadSettings(settings) {
+    if (!settings) return;
+    
+    // 加载文本和选择框的值
+    Object.entries(settings).forEach(([key, value]) => {
+        const element = document.getElementById(key);
+        if (element && typeof value !== 'object') {
+            element.value = value;
+        }
+    });
+    
+    // 加载复选框的值
+    if (settings.specialElements) {
+        Object.entries(settings.specialElements).forEach(([key, value]) => {
+            const element = document.getElementById(key);
+            if (element) element.checked = value;
+        });
+    }
+    
+    if (settings.worldElements) {
+        Object.entries(settings.worldElements).forEach(([key, value]) => {
+            const element = document.getElementById(key);
+            if (element) element.checked = value;
+        });
+    }
+}
+
+// 获取保存的小说列表
+function getSavedNovels() {
+    try {
+        const saves = localStorage.getItem('novel_autosaves');
+        return saves ? JSON.parse(saves) : [];
+    } catch (error) {
+        console.error('获取存列表失败:', error);
+        return [];
+    }
+}
+
+// 加载最后一次自动保存
+function loadLastAutosave() {
+    try {
+        const saves = getSavedNovels();
+        if (saves.length > 0) {
+            const lastSave = decompressData(saves[0]);
+            
+            // 恢复小说状态
+            currentNovel = lastSave.novel;
+            
+            // 加载设置
+            loadSettings(lastSave.settings);
+            
+            // 更新界面状态
+            updateProgress(lastSave.progress.currentStep);
+            updateGenerationStatus();
+            
+            // 显示提示
+            showAutosaveNotification();
+        }
+    } catch (error) {
+        console.error('加载自动保存失败:', error);
+    }
+}
+
+// 数据压缩
+function compressData(data) {
+    try {
+        return JSON.stringify(data);
+    } catch (error) {
+        console.error('数据压缩失败:', error);
+        return null;
+    }
+}
+
+// 数据解压
+function decompressData(compressedData) {
+    try {
+        return JSON.parse(compressedData);
+    } catch (error) {
+        console.error('数据解压失败:', error);
+        return null;
+    }
+}
+
+// 更新自动保存状态提示
+function updateAutosaveStatus(message, type = 'success') {
+    const saveStatus = document.querySelector('.save-status');
+    const saveText = saveStatus.querySelector('.save-text');
+    const saveTime = saveStatus.querySelector('.save-time');
+    const icon = saveStatus.querySelector('i');
+    
+    // 更新图标
+    icon.className = type === 'success' ? 'fas fa-save' : 'fas fa-exclamation-circle';
+    
+    // 更新消息
+    saveText.textContent = message;
+    
+    // 更新时间
+    const now = new Date();
+    saveTime.textContent = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+    
+    // 显示状态
+    saveStatus.classList.remove('fade-out');
+    saveStatus.classList.add('fade-in');
+    
+    // 3秒后淡出
+    setTimeout(() => {
+        saveStatus.classList.remove('fade-in');
+        saveStatus.classList.add('fade-out');
+    }, 3000);
+}
+
+// 显示自动保存通知
+function showAutosaveNotification() {
+    const notification = document.createElement('div');
+    notification.className = 'autosave-notification';
+    notification.innerHTML = `
+        <i class="fas fa-save"></i>
+        <span>检测到上次未完成的创作，是否恢复？</span>
+        <div class="notification-buttons">
+            <button onclick="restoreAutosave()" class="restore-btn">恢复</button>
+            <button onclick="dismissAutosave(this)" class="dismiss-btn">忽略</button>
+        </div>
+    `;
+    document.body.appendChild(notification);
+}
+
+// 恢复自动保存
+function restoreAutosave() {
+    const notification = document.querySelector('.autosave-notification');
+    if (notification) {
+        notification.remove();
+    }
+    // 内容已在loadLastAutosave中加载
+    updateAutosaveStatus('已恢复上次创作');
+}
+
+// 忽略自动保存
+function dismissAutosave(button) {
+    const notification = button.closest('.autosave-notification');
+    if (notification) {
+        notification.remove();
+    }
+    // 清除当前自动保存
+    localStorage.removeItem('novel_autosaves');
+}
+
+// 在初始化时启动自动保存
+document.addEventListener('DOMContentLoaded', () => {
+    aiStatus.textContent = 'AI引擎已就绪';
+    updateProgress(0);
+    // 初始化统计数据
+    statValues[0].textContent = '0';
+    statValues[1].textContent = '0';
+    statValues[2].textContent = '00:00';
+    initAutosave();
+}); 
 
 // 初始化数字输入控制
 document.querySelector('.minus').addEventListener('click', () => {
@@ -152,6 +414,192 @@ function startTimer() {
 // 停止计时器
 function stopTimer() {
     clearInterval(timerInterval);
+}
+
+// 添加大文本处理相关配置
+const TEXT_PROCESSING_CONFIG = {
+    chunkSize: 5000,        // 文本分块大小
+    renderBatchSize: 10,    // 渲染批次大小
+    renderDelay: 16,        // ���染延迟（毫秒）
+    maxContentLength: 1000000 // 最大内容长度
+};
+
+// 优化的文本处理函数
+function processLargeText(text, options = {}) {
+    const {
+        chunkSize = TEXT_PROCESSING_CONFIG.chunkSize,
+        renderBatchSize = TEXT_PROCESSING_CONFIG.renderBatchSize
+    } = options;
+
+    // 文本分块
+    const chunks = [];
+    for (let i = 0; i < text.length; i += chunkSize) {
+        chunks.push(text.slice(i, i + chunkSize));
+    }
+    
+    return chunks;
+}
+
+// 优化的内容渲染函数
+async function renderContent(element, chunks, options = {}) {
+    const {
+        renderBatchSize = TEXT_PROCESSING_CONFIG.renderBatchSize,
+        renderDelay = TEXT_PROCESSING_CONFIG.renderDelay,
+        className = ''
+    } = options;
+
+    // 创建文档片段
+    const fragment = document.createDocumentFragment();
+    
+    // 分批处理chunks
+    for (let i = 0; i < chunks.length; i += renderBatchSize) {
+        const batch = chunks.slice(i, i + renderBatchSize);
+        
+        // 处理每个批次
+        batch.forEach(chunk => {
+            const div = document.createElement('div');
+            div.className = className;
+            div.textContent = chunk;
+            fragment.appendChild(div);
+        });
+        
+        // 添加批次到DOM
+        element.appendChild(fragment.cloneNode(true));
+        
+        // 等待下一帧
+        if (i + renderBatchSize < chunks.length) {
+            await new Promise(resolve => setTimeout(resolve, renderDelay));
+        }
+    }
+}
+
+// 优化显示最终小说内容的函数
+async function displayNovel(content) {
+    // 清空现有内容
+    novelContent.innerHTML = '';
+    
+    // 检查内容长度
+    if (content.length > TEXT_PROCESSING_CONFIG.maxContentLength) {
+        console.warn('内容过长，将进行分段处理');
+    }
+    
+    // 分章节处理内容
+    const chapters = content.split(/(?=第[一二三四五六七八九十\d]+章)/);
+    
+    for (const chapter of chapters) {
+        if (!chapter.trim()) continue;
+        
+        // 分离章节标题和内容
+        const titleMatch = chapter.match(/^(第[一二三四五六七八九十\d]+章[^\n]*)/);
+        if (titleMatch) {
+            const title = titleMatch[1];
+            const content = chapter.slice(title.length).trim();
+            
+            // 显示章节标题
+            const titleElement = document.createElement('h2');
+            titleElement.className = 'chapter-title';
+            titleElement.textContent = title;
+            novelContent.appendChild(titleElement);
+            
+            // 处理章节内容
+            if (content) {
+                const contentChunks = processLargeText(content);
+                await renderContent(novelContent, contentChunks, {
+                    className: 'chapter-content'
+                });
+            }
+        } else {
+            // 处理普通段落
+            const contentChunks = processLargeText(chapter);
+            await renderContent(novelContent, contentChunks, {
+                className: 'paragraph'
+            });
+        }
+    }
+}
+
+// 优化流式文本显示函数
+async function streamText(element, text, options = {}) {
+    const {
+        delay = TEXT_ANIMATION.streamDelay,
+        chunkSize = TEXT_ANIMATION.chunkSize,
+        className = '',
+        isChapter = false,
+        append = false
+    } = options;
+
+    // 如果不是追加模式，清空现有内容
+    if (!append) {
+        element.innerHTML = '';
+    }
+
+    // 处理文本分段
+    const paragraphs = text.split('\n').filter(p => p.trim());
+    
+    // 使用文档片段优化DOM操作
+    const fragment = document.createDocumentFragment();
+    
+    for (const paragraph of paragraphs) {
+        // 创建新的段落元素
+        const paragraphElement = document.createElement('div');
+        paragraphElement.className = className;
+        
+        // 如果是章节标题，添加特殊样式
+        if (isChapter && /^第[一二三四五六七八九十\d]+章/.test(paragraph)) {
+            paragraphElement.classList.add('chapter-title');
+        } else {
+            paragraphElement.style.textIndent = '2em';
+        }
+        
+        fragment.appendChild(paragraphElement);
+        
+        // 分块处理文本
+        const textChunks = processLargeText(paragraph, { chunkSize });
+        
+        for (const chunk of textChunks) {
+            // 检查是否包含标点符号
+            const hasPunctuation = /[，。！？；：、]/.test(chunk);
+            
+            // 更新段落内容
+            paragraphElement.textContent += chunk;
+            
+            // 标点符号处停顿更长时间
+            await new Promise(resolve => 
+                setTimeout(resolve, hasPunctuation ? TEXT_ANIMATION.punctuationPause : delay)
+            );
+        }
+    }
+    
+    // 一次性添加所有内容
+    element.appendChild(fragment);
+    
+    // 自动滚动到底部
+    element.scrollTop = element.scrollHeight;
+}
+
+// 优化内存使用的垃圾回收辅助函数
+function cleanupMemory() {
+    // 清理不需要的DOM元素
+    const oldContent = novelContent.innerHTML;
+    novelContent.innerHTML = '';
+    novelContent.innerHTML = oldContent;
+    
+    // 手动触发垃圾回收（仅建议）
+    if (window.gc) {
+        window.gc();
+    }
+}
+
+// 在生成过程中定期清理内存
+function scheduleMemoryCleanup() {
+    const cleanupInterval = setInterval(() => {
+        if (currentNovel.generatedChapters > 0 && 
+            currentNovel.generatedChapters % 10 === 0) {
+            cleanupMemory();
+        }
+    }, 60000); // 每分钟检查一次
+    
+    return cleanupInterval;
 }
 
 // 修改生成小说的主要函数
@@ -230,6 +678,9 @@ async function generateNovel() {
     aiStatus.textContent = 'AI引擎正在运行...';
     
     try {
+        // 启动内存清理调度
+        const cleanupInterval = scheduleMemoryCleanup();
+        
         // 1. 生成世界观和背景设定
         updateLoadingText('正在构建世界观和背景设定...');
         updateProgress(0);
@@ -295,6 +746,11 @@ async function generateNovel() {
         // 更新最终统计
         updateGenerationStatus();
         aiStatus.textContent = '生成完成';
+        
+        // 清理工作
+        clearInterval(cleanupInterval);
+        cleanupMemory();
+        
     } catch (error) {
         aiStatus.textContent = '生成出错';
         alert('生成小说时发生错误：' + error.message);
@@ -307,64 +763,89 @@ async function generateNovel() {
 
 // 生成提示词函数
 function generateWorldSettingsPrompt() {
-    const { genre, style, settings } = currentNovel;
+    const settings = currentNovel.settings;
+    logSettingsUsage('世界观生成', settings);
     
-    return `作为一位世界观构建专家，请为一部${genre}类型的小说《${currentNovel.title}》创建完整的世界观和背景设定。
+    return `作为一位世界观构建专家，请为一部${settings.novelType}类型的小说《${currentNovel.title}》创建完整的世界观和背景设定。
 
 写作要求：
-- 写作风格：${style}风格
-- 世界复杂度：${settings.plotComplexity === 'complex' ? '高度复杂' : settings.plotComplexity === 'medium' ? '中等复杂' : '简单明了'}
-${settings.specialElements.length > 0 ? `- 特殊元素：${settings.specialElements.join('、')}` : ''}
+- 写作风格：${settings.writeStyle}
+- 世界复杂度：${settings.plotComplexity}
+- 时代背景：${settings.timeBackground}
+- 地理环境：${settings.geography}
+- 语言风格：${settings.languageStyle}
+
+${settings.worldElements.hasMagic ? '- 需要包含魔法体系\n' : ''}
+${settings.worldElements.hasTechnology ? '- 需要包含科技体系\n' : ''}
+${settings.worldElements.hasReligion ? '- 需要包含宗教体系\n' : ''}
+${settings.worldElements.hasPolitics ? '- 需要包含政治体系\n' : ''}
 
 需要包含：
-1. 时代背景
-2. 世界规则
-3. 社会制度
-4. 重要场景
-5. 特殊元素
+1. 详细的时代背景描述
+2. 完整的世界规则体系
+3. 具体的社会制度设定
+4. 重要场景和地理环境
+5. 特色元素和文化特征
+
 ${currentNovel.outline ? '参考情节概要：' + currentNovel.outline : ''}`;
 }
 
 function generateCharactersPrompt() {
-    const { settings } = currentNovel;
+    const settings = currentNovel.settings;
+    logSettingsUsage('人物生成', settings);
+    
     const characterCount = CONFIG.characterCount[settings.characterComplexity];
     
-    return `基于已有的世界观设定，为小说《${currentNovel.title}》创建一组富立体的角色。
+    return `基于已有的世界观设定，为小说《${currentNovel.title}》创建一组富有特色的角色。
 
 创作要求：
 - 主要人物数量：${characterCount.min}-${characterCount.max}个
 - 人物复杂度：${settings.characterComplexity}
-- 写作风格：${currentNovel.style}
-${settings.specialElements.includes('romance') ? '- 需要包含适合发展感情线的角色' : ''}
-${settings.specialElements.includes('conflict') ? '- 需要包含对立/对抗角色' : ''}
+- 写作风格：${settings.writeStyle}
+- 情感基调：${settings.emotionalTone}
+- 情感发展：${settings.emotionalChange}
+- 叙事视角：${settings.narrativePerspective}
 
-请设计：
-1. 主角设定（性格、背景、动机）
-2. 重要配角设定
-3. 角色关系网络
-4. 人物成长轨迹
+特殊要求：
+${settings.specialElements.hasRomance ? '- 需要设计适合发展感情线的角色\n' : ''}
+${settings.specialElements.hasConflict ? '- 需要设计对立/对抗角色\n' : ''}
+${settings.specialElements.hasMystery ? '- 需要设计神秘/隐藏身份的角色\n' : ''}
+${settings.specialElements.hasHumor ? '- 需要设计幽默/轻松的角色\n' : ''}
+
+请详细设计：
+1. 主角设定（性格、背景、动机、成长轨迹）
+2. 重要配角设定（与主角的关系、独特特征）
+3. 角色关系网络图
+4. 每个角色的发展规划
 
 参考世界观：${JSON.stringify(currentNovel.worldSettings)}`;
 }
 
 // 修改大纲生成函数
 async function generateDetailedOutline(chapterCount) {
+    const settings = currentNovel.settings;
+    logSettingsUsage('大纲生成', settings);
+    
     try {
         // 1. 生成故事核心架构
+        log('开始生成故事核心架构', 'info');
         const storyStructure = await generateStoryStructure();
         
         // 2. 生成关键情节点
+        log('开始生成关键情节点', 'info');
         const plotPoints = await generatePlotPoints(storyStructure);
         
         // 3. 分配章节内容
+        log('开始分配章节内容', 'info');
         const chapterOutlines = await distributeChapters(plotPoints, chapterCount);
         
         // 4. 验证和优化大纲
+        log('开始验证和优化大纲', 'info');
         const verifiedOutline = await verifyAndOptimizeOutline(chapterOutlines);
         
         return verifiedOutline;
     } catch (error) {
-        console.error('大纲生成错误:', error);
+        log('大纲生成错误: ' + error.message, 'error');
         throw error;
     }
 }
@@ -398,7 +879,7 @@ async function generatePlotPoints(storyStructure) {
     const prompt = `基于已有的故事架构，为《${currentNovel.title}》设计详细的关键情节点。
 故事架构：${storyStructure}
 
-请按照以下比例分配情节：
+请按照以下���例分配情节：
 1. 开篇/引子 (${OUTLINE_CONFIG.plotPoints.introduction * 100}%)：
    - 世界背景展示
    - 主要人物登场
@@ -445,7 +926,7 @@ async function distributeChapters(plotPoints, chapterCount) {
    - 核心事件
    - 次要情节
    - 人物互动
-   - 环境描写
+   - 环境���写
 3. 章节之间要有合理的承接
 4. 重要情节要分配足够的篇幅
 5. 次要情节要适当分配
@@ -555,7 +1036,7 @@ ${useMetaphor ? '- 适当运用比喻修辞\n' : ''}${useSymbolism ? '- 使用�
 - 采用${languageStyle}风格
 ${settings.specialElements.map(element => `- ${getElementRequirement(element)}`).join('\n')}
 
-章节要求：
+���节要求：
 1. 遵循大纲设定的情节发展
 2. 融入已设定的世界观元素
 3. 展现人物性格和互动
@@ -955,103 +1436,6 @@ async function checkApiConnection() {
     }
 }
 
-// 流式显示文本
-async function streamText(element, text, options = {}) {
-    const {
-        delay = TEXT_ANIMATION.streamDelay,
-        chunkSize = TEXT_ANIMATION.chunkSize,
-        className = '',
-        isChapter = false
-    } = options;
-
-    // 清空现有内容
-    if (!options.append) {
-        element.innerHTML = '';
-    }
-
-    // 创建新的段落元素
-    const paragraph = document.createElement('div');
-    paragraph.className = className;
-    element.appendChild(paragraph);
-
-    // 如果是章节题，添加特殊样式
-    if (isChapter) {
-        paragraph.classList.add('chapter-title');
-    }
-
-    let currentText = '';
-    const chars = text.split('');
-    
-    for (let i = 0; i < chars.length; i += chunkSize) {
-        const chunk = chars.slice(i, i + chunkSize).join('');
-        currentText += chunk;
-        
-        // 检查是否包含标点符号
-        const hasPunctuation = /[，。！？；：]/.test(chunk);
-        
-        paragraph.textContent = currentText;
-        
-        // 自动滚动到底部
-        element.scrollTop = element.scrollHeight;
-        
-        // 标点符号处停顿更长时间
-        await new Promise(resolve => 
-            setTimeout(resolve, hasPunctuation ? TEXT_ANIMATION.punctuationPause : delay)
-        );
-    }
-}
-
-// 显示生成进度
-async function displayProgress() {
-    const progress = currentNovel.chapters.join('\n\n');
-    await streamText(novelContent, progress, { append: true });
-}
-
-// 显示最终小说内容
-async function displayNovel(content) {
-    // 分段处理内容
-    const sections = content.split(/(?=第[一二三四五六七八九十\d]+章)/);
-    
-    // 清空现有内容
-    novelContent.innerHTML = '';
-    
-    // 逐章节显示
-    for (const section of sections) {
-        if (section.trim()) {
-            // 检查是章节标题
-            const isChapterTitle = /^第[一二三四五六七八九十\d]+章/.test(section);
-            
-            if (isChapterTitle) {
-                // 提取章节标题
-                const titleMatch = section.match(/^第[一二三四五六七八九十\d]+章[^\n]*/);
-                const title = titleMatch ? titleMatch[0] : '';
-                const content = section.replace(title, '').trim();
-                
-                // 显示章节标题
-                await streamText(novelContent, title, {
-                    className: 'chapter-title',
-                    append: true,
-                    delay: TEXT_ANIMATION.streamDelay * 2
-                });
-                
-                // 显示章节内容
-                if (content) {
-                    await streamText(novelContent, '\n' + content, {
-                        className: 'chapter-content',
-                        append: true
-                    });
-                }
-            } else {
-                // 显示普通段落
-                await streamText(novelContent, section, {
-                    className: 'paragraph',
-                    append: true
-                });
-            }
-        }
-    }
-}
-
 // 格式化小说内容
 function formatNovelContent(content) {
     // 添加章节分隔符和样式
@@ -1111,16 +1495,6 @@ generateBtn.addEventListener('mouseover', () => {
 generateBtn.addEventListener('mouseout', () => {
     generateBtn.querySelector('.btn-particles').style.opacity = '0';
 });
-
-// 初始化
-document.addEventListener('DOMContentLoaded', () => {
-    aiStatus.textContent = 'AI引擎已就绪';
-    updateProgress(0);
-    // 初始化统计数据
-    statValues[0].textContent = '0';
-    statValues[1].textContent = '0';
-    statValues[2].textContent = '00:00';
-}); 
 
 // 添加CSS样式
 const style = document.createElement('style');
@@ -1186,3 +1560,601 @@ document.querySelectorAll('[data-tooltip]').forEach(element => {
         document.querySelector('.tooltip')?.remove();
     });
 }); 
+
+// 添加自动保存状态UI元素
+const saveStatusContainer = document.createElement('div');
+saveStatusContainer.className = 'save-status-container';
+saveStatusContainer.innerHTML = `
+    <div class="save-status">
+        <i class="fas fa-save"></i>
+        <span class="save-text"></span>
+        <div class="save-time"></div>
+    </div>
+`;
+document.body.appendChild(saveStatusContainer);
+
+// 添加保存统计信息更新函数
+function updateSaveStats() {
+    const saves = getSavedNovels();
+    const statsContainer = document.querySelector('.save-stats');
+    if (!statsContainer) return;
+    
+    statsContainer.innerHTML = `
+        <div class="stat-item">
+            <span class="stat-label">保存版本</span>
+            <span class="stat-value">${saves.length}/${AUTOSAVE_CONFIG.maxSaves}</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">上次保存</span>
+            <span class="stat-value">${getLastSaveTime()}</span>
+        </div>
+    `;
+}
+
+// 获取最后保存时间
+function getLastSaveTime() {
+    const saves = getSavedNovels();
+    if (saves.length === 0) return '无';
+    
+    const lastSave = decompressData(saves[0]);
+    const lastSaveTime = new Date(lastSave.timestamp);
+    const now = new Date();
+    
+    // 如果是今天
+    if (lastSaveTime.toDateString() === now.toDateString()) {
+        return `今天 ${lastSaveTime.getHours().toString().padStart(2, '0')}:${lastSaveTime.getMinutes().toString().padStart(2, '0')}`;
+    }
+    
+    // 如果是昨天
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (lastSaveTime.toDateString() === yesterday.toDateString()) {
+        return `昨天 ${lastSaveTime.getHours().toString().padStart(2, '0')}:${lastSaveTime.getMinutes().toString().padStart(2, '0')}`;
+    }
+    
+    // 其他日期
+    return `${lastSaveTime.getMonth() + 1}月${lastSaveTime.getDate()}日 ${lastSaveTime.getHours().toString().padStart(2, '0')}:${lastSaveTime.getMinutes().toString().padStart(2, '0')}`;
+}
+
+// 添加自动保存相关样式
+const autoSaveStyle = document.createElement('style');
+autoSaveStyle.textContent = `
+    .save-status-container {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 1000;
+    }
+
+    .save-status {
+        background: rgba(30, 39, 46, 0.95);
+        color: var(--text-color);
+        padding: 12px 20px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        border: 1px solid var(--border-color);
+        opacity: 0;
+        transform: translateY(20px);
+        transition: all 0.3s ease;
+    }
+
+    .save-status.fade-in {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .save-status.fade-out {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    .save-status i {
+        font-size: 1.2em;
+        color: var(--primary-color);
+    }
+
+    .save-status i.fa-exclamation-circle {
+        color: var(--error-color);
+    }
+
+    .save-text {
+        font-size: 0.9em;
+        font-weight: 500;
+    }
+
+    .save-time {
+        font-size: 0.8em;
+        color: var(--text-secondary);
+        margin-left: auto;
+    }
+
+    .save-stats {
+        position: fixed;
+        bottom: 80px;
+        right: 20px;
+        background: rgba(30, 39, 46, 0.95);
+        padding: 15px;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .stat-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+
+    .stat-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .stat-label {
+        color: var(--text-secondary);
+        font-size: 0.9em;
+    }
+
+    .stat-value {
+        color: var(--text-color);
+        font-weight: 500;
+    }
+
+    .autosave-notification {
+        animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+`;
+document.head.appendChild(autoSaveStyle);
+
+// 在初始化时添加保存统计面板
+document.addEventListener('DOMContentLoaded', () => {
+    const statsContainer = document.createElement('div');
+    statsContainer.className = 'save-stats';
+    document.body.appendChild(statsContainer);
+    updateSaveStats();
+    // ... existing initialization code ...
+}); 
+
+// 添加流程监控配置
+const MONITOR_CONFIG = {
+    logLevel: 'debug', // debug, info, warn, error
+    showTimestamp: true,
+    maxLogs: 100,
+    autoScroll: true
+};
+
+// 创建监控面板
+const monitorPanel = document.createElement('div');
+monitorPanel.className = 'monitor-panel';
+monitorPanel.innerHTML = `
+    <div class="monitor-header">
+        <h3>流程监控</h3>
+        <div class="monitor-controls">
+            <button class="clear-log">清除日志</button>
+            <button class="toggle-log">隐藏/显示</button>
+        </div>
+    </div>
+    <div class="monitor-content">
+        <div class="log-container"></div>
+        <div class="status-container">
+            <div class="status-item">
+                <span class="status-label">当前状态</span>
+                <span class="current-status">就绪</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">API状态</span>
+                <span class="api-status">未检查</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">内存使用</span>
+                <span class="memory-status">-</span>
+            </div>
+        </div>
+    </div>
+`;
+document.body.appendChild(monitorPanel);
+
+// 添加监控面板样式
+const monitorStyle = document.createElement('style');
+monitorStyle.textContent = `
+    .monitor-panel {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        width: 360px;
+        background: rgba(30, 39, 46, 0.95);
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        z-index: 1000;
+        color: var(--text-color);
+        font-family: monospace;
+    }
+
+    .monitor-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 15px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .monitor-header h3 {
+        margin: 0;
+        font-size: 1em;
+        color: var(--primary-color);
+    }
+
+    .monitor-controls {
+        display: flex;
+        gap: 8px;
+    }
+
+    .monitor-controls button {
+        padding: 4px 8px;
+        border: none;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--text-color);
+        cursor: pointer;
+        font-size: 0.8em;
+        transition: all 0.3s ease;
+    }
+
+    .monitor-controls button:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    .monitor-content {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .log-container {
+        padding: 10px;
+        font-size: 0.9em;
+        line-height: 1.4;
+    }
+
+    .log-entry {
+        margin-bottom: 4px;
+        padding: 4px;
+        border-radius: 4px;
+        animation: fadeIn 0.3s ease;
+    }
+
+    .log-entry.debug { color: #8be9fd; }
+    .log-entry.info { color: #50fa7b; }
+    .log-entry.warn { color: #ffb86c; }
+    .log-entry.error { color: #ff5555; }
+
+    .log-timestamp {
+        color: #6272a4;
+        margin-right: 8px;
+    }
+
+    .status-container {
+        padding: 10px;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .status-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+    }
+
+    .status-label {
+        color: var(--text-secondary);
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-2px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+`;
+document.head.appendChild(monitorStyle);
+
+// 日志记录函数
+function log(message, level = 'info') {
+    if (!shouldLog(level)) return;
+
+    const logContainer = document.querySelector('.log-container');
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${level}`;
+
+    if (MONITOR_CONFIG.showTimestamp) {
+        const timestamp = new Date().toLocaleTimeString();
+        entry.innerHTML = `<span class="log-timestamp">[${timestamp}]</span>`;
+    }
+
+    entry.innerHTML += message;
+    logContainer.appendChild(entry);
+
+    // 限制日志数量
+    while (logContainer.children.length > MONITOR_CONFIG.maxLogs) {
+        logContainer.removeChild(logContainer.firstChild);
+    }
+
+    // 自动滚动
+    if (MONITOR_CONFIG.autoScroll) {
+        logContainer.scrollTop = logContainer.scrollHeight;
+    }
+}
+
+// 判断是否应该记录日志
+function shouldLog(level) {
+    const levels = ['debug', 'info', 'warn', 'error'];
+    const configLevel = levels.indexOf(MONITOR_CONFIG.logLevel);
+    const messageLevel = levels.indexOf(level);
+    return messageLevel >= configLevel;
+}
+
+// 更新状��显示
+function updateStatus(status) {
+    const currentStatus = document.querySelector('.current-status');
+    currentStatus.textContent = status;
+    log(`状态更新: ${status}`, 'info');
+}
+
+// 更新API状态
+function updateApiStatus(status, details = '') {
+    const apiStatus = document.querySelector('.api-status');
+    apiStatus.textContent = status;
+    if (details) {
+        log(`API状态: ${status} - ${details}`, status === 'error' ? 'error' : 'info');
+    }
+}
+
+// 更新内存状态
+function updateMemoryStatus() {
+    const memoryStatus = document.querySelector('.memory-status');
+    if (window.performance && window.performance.memory) {
+        const used = Math.round(window.performance.memory.usedJSHeapSize / 1024 / 1024);
+        const total = Math.round(window.performance.memory.totalJSHeapSize / 1024 / 1024);
+        memoryStatus.textContent = `${used}MB / ${total}MB`;
+    } else {
+        memoryStatus.textContent = '不可用';
+    }
+}
+
+// 监控事件处理
+document.querySelector('.clear-log').addEventListener('click', () => {
+    document.querySelector('.log-container').innerHTML = '';
+    log('日志已清除', 'info');
+});
+
+document.querySelector('.toggle-log').addEventListener('click', () => {
+    const content = document.querySelector('.monitor-content');
+    content.style.display = content.style.display === 'none' ? 'block' : 'none';
+});
+
+// 定期更新内存状态
+setInterval(updateMemoryStatus, 5000);
+
+// 修改现有函数以添加日志
+let originalGenerateNovel = generateNovel;
+generateNovel = async function() {
+    const settings = getAllSettings();
+    logSettingsUsage('初始化', settings);
+    
+    if (!validateSettings(settings)) {
+        log('设置验证失败，请检查所有必要设置', 'error');
+        alert('请确保所有必要的设置都已完成');
+        return;
+    }
+    
+    log('开始生成小说', 'info');
+    updateStatus('正在初始化');
+    
+    try {
+        await originalGenerateNovel.apply(this, arguments);
+        log('小说生成完成', 'info');
+        updateStatus('生成完成');
+    } catch (error) {
+        log(`生成过程错误: ${error.message}`, 'error');
+        updateStatus('生成失败');
+        throw error;
+    }
+};
+
+// 修改API调用函数以添加日志
+const originalCallAPI = callAPI;
+callAPI = async function(prompt, temperature) {
+    log(`API调用开始 - Temperature: ${temperature}`, 'debug');
+    updateApiStatus('调用中');
+    
+    try {
+        const result = await originalCallAPI.apply(this, arguments);
+        log('API调用成功', 'info');
+        updateApiStatus('正常');
+        return result;
+    } catch (error) {
+        log(`API调用失败: ${error.message}`, 'error');
+        updateApiStatus('错误', error.message);
+        throw error;
+    }
+};
+
+// 修改自动保存函数以添加日志
+const originalAutoSaveNovel = autoSaveNovel;
+autoSaveNovel = function() {
+    log('开始自动保存', 'debug');
+    
+    try {
+        originalAutoSaveNovel.apply(this, arguments);
+        log('自动保存成功', 'info');
+    } catch (error) {
+        log(`自动保存失败: ${error.message}`, 'error');
+        throw error;
+    }
+};
+
+// 修改流式生成函数以添加日志
+const originalStreamGenerateContent = streamGenerateContent;
+streamGenerateContent = async function(type, prompt, options = {}) {
+    log(`开始流式生成 - 类型: ${type}`, 'debug');
+    
+    try {
+        const result = await originalStreamGenerateContent.apply(this, arguments);
+        log(`流式生成完成 - 类型: ${type}`, 'info');
+        return result;
+    } catch (error) {
+        log(`流式生成失败 - 类型: ${type}: ${error.message}`, 'error');
+        throw error;
+    }
+};
+
+// 在初始化时添加日志
+document.addEventListener('DOMContentLoaded', () => {
+    log('系统初始化完成', 'info');
+    updateStatus('就绪');
+    updateApiStatus('未连接');
+    // ... existing initialization code ...
+}); 
+
+// 添加设置监控函数
+function logSettingsUsage(stage, settings) {
+    log(`[设置使用] ${stage}阶段使用的设置:`, 'debug');
+    Object.entries(settings).forEach(([key, value]) => {
+        log(`  - ${key}: ${JSON.stringify(value)}`, 'debug');
+    });
+}
+
+// 修改 currentNovel 的设置初始化
+currentNovel = {
+    title,
+    outline: plotIdea,
+    characters: [],
+    chapters: [],
+    worldSettings: {},
+    genre: novelType,
+    style: writeStyle,
+    settings: getAllSettings(), // 使用完整的设置
+    currentStep: 0,
+    totalWords: 0,
+    generatedChapters: 0
+};
+
+// 修改世界观生成函数
+function generateWorldSettingsPrompt() {
+    const settings = currentNovel.settings;
+    logSettingsUsage('世界观生成', settings);
+    
+    return `作为一位世界观构建专家，请为一部${settings.novelType}类型的小说《${currentNovel.title}》创建完整的世界观和背景设定。
+
+写作要求：
+- 写作风格：${settings.writeStyle}
+- 世界复杂度：${settings.plotComplexity}
+- 时代背景：${settings.timeBackground}
+- 地理环境：${settings.geography}
+- 语言风格：${settings.languageStyle}
+
+${settings.worldElements.hasMagic ? '- 需要包含魔法体系\n' : ''}
+${settings.worldElements.hasTechnology ? '- 需要包含科技体系\n' : ''}
+${settings.worldElements.hasReligion ? '- 需要包含宗教体系\n' : ''}
+${settings.worldElements.hasPolitics ? '- 需要包含政治体系\n' : ''}
+
+需要包含：
+1. 详细的时代背景描述
+2. 完整的世界规则体系
+3. 具体的社会制度设定
+4. 重要场景和地理环境
+5. 特色元素和文化特征
+
+${currentNovel.outline ? '参考情节概要：' + currentNovel.outline : ''}`;
+}
+
+// 修改人物生成函数
+function generateCharactersPrompt() {
+    const settings = currentNovel.settings;
+    logSettingsUsage('人物生成', settings);
+    
+    const characterCount = CONFIG.characterCount[settings.characterComplexity];
+    
+    return `基于已有的世界观设定，为小说《${currentNovel.title}》创建一组富有特色的角色。
+
+创作要求：
+- 主要人物数量：${characterCount.min}-${characterCount.max}个
+- 人物复杂度：${settings.characterComplexity}
+- 写作风格：${settings.writeStyle}
+- 情感基调：${settings.emotionalTone}
+- 情感发展：${settings.emotionalChange}
+- 叙事视角：${settings.narrativePerspective}
+
+特殊要求：
+${settings.specialElements.hasRomance ? '- 需要设计适合发展感情线的角色\n' : ''}
+${settings.specialElements.hasConflict ? '- 需要设计对立/对抗角色\n' : ''}
+${settings.specialElements.hasMystery ? '- 需要设计神秘/隐藏身份的角色\n' : ''}
+${settings.specialElements.hasHumor ? '- 需要设计幽默/轻松的角色\n' : ''}
+
+请详细设计：
+1. 主角设定（性格、背景、动机、成长轨迹）
+2. 重要配角设定（与主角的关系、独特特征）
+3. 角色关系网络图
+4. 每个角色的发展规划
+
+参考世界观：${JSON.stringify(currentNovel.worldSettings)}`;
+}
+
+// 修改大纲生成函数
+async function generateDetailedOutline(chapterCount) {
+    const settings = currentNovel.settings;
+    logSettingsUsage('大纲生成', settings);
+    
+    try {
+        // 1. 生成故事核心架构
+        log('开始生成故事核心架构', 'info');
+        const storyStructure = await generateStoryStructure();
+        
+        // 2. 生成关键情节点
+        log('开始生成关键情节点', 'info');
+        const plotPoints = await generatePlotPoints(storyStructure);
+        
+        // 3. 分配章节内容
+        log('开始分配章节内容', 'info');
+        const chapterOutlines = await distributeChapters(plotPoints, chapterCount);
+        
+        // 4. 验证和优化大纲
+        log('开始验证和优化大纲', 'info');
+        const verifiedOutline = await verifyAndOptimizeOutline(chapterOutlines);
+        
+        return verifiedOutline;
+    } catch (error) {
+        log('大纲生成错误: ' + error.message, 'error');
+        throw error;
+    }
+}
+
+// 添加设置验证函数
+function validateSettings(settings) {
+    const requiredSettings = [
+        'novelType', 'writeStyle', 'chapterLength', 'characterComplexity',
+        'plotComplexity', 'narrativePerspective', 'detailLevel', 'dialogueRatio',
+        'emotionalTone', 'languageStyle'
+    ];
+    
+    const missingSettings = requiredSettings.filter(key => !settings[key]);
+    
+    if (missingSettings.length > 0) {
+        log(`缺少必要设置: ${missingSettings.join(', ')}`, 'warn');
+        return false;
+    }
+    
+    return true;
+}
