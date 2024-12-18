@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI小说生成器</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="ai-background">
+        <div class="ai-particles"></div>
+        <div class="container">
+            <div class="header">
+                <h1><i class="fas fa-robot"></i> AI小说生成器</h1>
+                <div class="ai-status">
+                    <div class="ai-pulse"></div>
+                    <span>AI引擎已就绪</span>
+                </div>
+            </div>
+            
+            <!-- 输入部分 -->
+            <div class="input-section">
+                <div class="input-group">
+                    <label><i class="fas fa-book"></i> 小说标题</label>
+                    <input type="text" id="novelTitle" placeholder="输入小说标题" class="input-field">
+                </div>
+                <div class="input-group">
+                    <label><i class="fas fa-feather-alt"></i> 情节构思</label>
+                    <textarea id="plotIdea" placeholder="输入小说大纲或关键情节点（可选）" class="input-field"></textarea>
+                </div>
+                
+                <!-- 基础设置 -->
+                <div class="settings-group">
+                    <h3><i class="fas fa-cogs"></i> 基础设置</h3>
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label><i class="fas fa-theater-masks"></i> 小说类型</label>
+                            <select id="novelType" class="input-field">
+                                <option value="fantasy">奇幻</option>
+                                <option value="romance">言情</option>
+                                <option value="scifi">科幻</option>
+                                <option value="mystery">悬疑</option>
+                                <option value="adventure">冒险</option>
+                                <option value="history">历史</option>
+                                <option value="martial">武侠</option>
+                                <option value="horror">恐怖</option>
+                                <option value="urban">都市</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label><i class="fas fa-pen-nib"></i> 写作风格</label>
+                            <select id="writeStyle" class="input-field">
+                                <option value="realistic">写实派</option>
+                                <option value="romantic">浪漫派</option>
+                                <option value="humorous">幽默风</option>
+                                <option value="literary">文艺风</option>
+                                <option value="simple">简洁风</option>
+                                <option value="elaborate">华丽风</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 高级设置 -->
+                <div class="settings-group">
+                    <h3><i class="fas fa-sliders-h"></i> 高级设置</h3>
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label><i class="fas fa-list-ol"></i> 章节数量</label>
+                            <div class="number-input">
+                                <button type="button" class="minus">-</button>
+                                <input type="number" id="chapterCount" placeholder="章节数量" class="input-field" min="1" max="50" value="10">
+                                <button type="button" class="plus">+</button>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label><i class="fas fa-text-height"></i> 每章字数</label>
+                            <select id="chapterLength" class="input-field">
+                                <option value="short">短篇(2000字左右)</option>
+                                <option value="medium" selected>中等(3000-4000字)</option>
+                                <option value="long">长篇(5000字以上)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label><i class="fas fa-users"></i> 人物复杂度</label>
+                            <select id="characterComplexity" class="input-field">
+                                <option value="simple">简单(2-3个主要人物)</option>
+                                <option value="medium" selected>中等(4-6个主要人物)</option>
+                                <option value="complex">复杂(7个以上主要人物)</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label><i class="fas fa-project-diagram"></i> 情节复杂度</label>
+                            <select id="plotComplexity" class="input-field">
+                                <option value="linear">单线发展</option>
+                                <option value="medium" selected>双线交织</option>
+                                <option value="complex">多线并行</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 特殊设置 -->
+                <div class="settings-group">
+                    <h3><i class="fas fa-star"></i> 特殊设置</h3>
+                    <div class="checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="hasRomance"> 
+                            <i class="fas fa-heart"></i> 包含感情线
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="hasConflict" checked> 
+                            <i class="fas fa-bolt"></i> 包含对抗情节
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="hasMystery"> 
+                            <i class="fas fa-question-circle"></i> 包含悬疑元素
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="hasHumor"> 
+                            <i class="fas fa-laugh"></i> 包含幽默元素
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 叙事视角设置 -->
+                <div class="settings-group">
+                    <h3><i class="fas fa-eye"></i> 叙事视角设置</h3>
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label><i class="fas fa-street-view"></i> 主要视角</label>
+                            <select id="narrativePerspective" class="input-field">
+                                <option value="first">第一人称</option>
+                                <option value="third" selected>第三人称</option>
+                                <option value="omniscient">全知视角</option>
+                                <option value="multiple">多视角</option>
+                                <option value="second">第二人称</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label><i class="fas fa-exchange-alt"></i> 视角切换</label>
+                            <select id="perspectiveChange" class="input-field">
+                                <option value="fixed">固定视角</option>
+                                <option value="dynamic">动态切换</option>
+                                <option value="chapter">按章节切换</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 写作技巧设置 -->
+                <div class="settings-group">
+                    <h3><i class="fas fa-feather-alt"></i> 写作技巧设置</h3>
+                    <div class="slider-group">
+                        <div class="slider-item">
+                            <label><i class="fas fa-paint-brush"></i> 描写细节程度</label>
+                            <input type="range" id="detailLevel" min="1" max="5" value="3" class="slider">
+                            <div class="slider-labels">
+                                <span>简练</span>
+                                <span>适中</span>
+                                <span>细腻</span>
+                            </div>
+                        </div>
+                        <div class="slider-item">
+                            <label><i class="fas fa-theater-masks"></i> 对话比重</label>
+                            <input type="range" id="dialogueRatio" min="1" max="5" value="3" class="slider">
+                            <div class="slider-labels">
+                                <span>较少</span>
+                                <span>适中</span>
+                                <span>较多</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="useMetaphor"> 
+                            <i class="fas fa-magic"></i> 运用比喻修辞
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="useSymbolism"> 
+                            <i class="fas fa-dove"></i> 使用象征手法
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="useFlashback"> 
+                            <i class="fas fa-history"></i> 插入回忆/闪回
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="useStream"> 
+                            <i class="fas fa-water"></i> 意识流手法
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 情感氛围设置 -->
+                <div class="settings-group">
+                    <h3><i class="fas fa-heart"></i> 情感氛围设置</h3>
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label><i class="fas fa-palette"></i> 主要基调</label>
+                            <select id="emotionalTone" class="input-field">
+                                <option value="positive">积极向上</option>
+                                <option value="negative">深沉压抑</option>
+                                <option value="neutral" selected>中性写实</option>
+                                <option value="complex">复杂多变</option>
+                                <option value="light">轻松欢快</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label><i class="fas fa-wave-square"></i> 情感起伏</label>
+                            <select id="emotionalChange" class="input-field">
+                                <option value="stable">平稳发展</option>
+                                <option value="dramatic">剧烈波动</option>
+                                <option value="gradual" selected>渐进变化</option>
+                                <option value="cyclic">循环往复</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 世界观详细设置 -->
+                <div class="settings-group">
+                    <h3><i class="fas fa-globe-asia"></i> 世界观详细设置</h3>
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label><i class="fas fa-clock"></i> 时代背景</label>
+                            <select id="timeBackground" class="input-field">
+                                <option value="ancient">远古时代</option>
+                                <option value="medieval">中世纪</option>
+                                <option value="modern" selected>现代</option>
+                                <option value="future">未来</option>
+                                <option value="mixed">混合时空</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label><i class="fas fa-map-marked-alt"></i> 地理环境</label>
+                            <select id="geography" class="input-field">
+                                <option value="urban">都市</option>
+                                <option value="rural">乡村</option>
+                                <option value="wilderness">荒野</option>
+                                <option value="fantasy">虚构世界</option>
+                                <option value="mixed">多元环境</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="hasMagic"> 
+                            <i class="fas fa-hat-wizard"></i> 魔法体系
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="hasTechnology"> 
+                            <i class="fas fa-microchip"></i> 科技体系
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="hasReligion"> 
+                            <i class="fas fa-pray"></i> 宗教信仰
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="hasPolitics"> 
+                            <i class="fas fa-landmark"></i> 政治制度
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 高级语言设置 -->
+                <div class="settings-group">
+                    <h3><i class="fas fa-language"></i> 高级语言设置</h3>
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label><i class="fas fa-text-height"></i> 语言风格</label>
+                            <select id="languageStyle" class="input-field">
+                                <option value="modern">现代白话</option>
+                                <option value="classical">文言文风</option>
+                                <option value="mixed" selected>雅俗结合</option>
+                                <option value="poetic">诗意语言</option>
+                                <option value="simple">简约直白</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label><i class="fas fa-paragraph"></i> 段落长度</label>
+                            <select id="paragraphLength" class="input-field">
+                                <option value="short">简短</option>
+                                <option value="medium" selected>中等</option>
+                                <option value="long">较长</option>
+                                <option value="mixed">长短结合</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="slider-group">
+                        <div class="slider-item">
+                            <label><i class="fas fa-quote-right"></i> 修辞手法运用</label>
+                            <input type="range" id="rhetoricLevel" min="1" max="5" value="3" class="slider">
+                            <div class="slider-labels">
+                                <span>朴实</span>
+                                <span>适中</span>
+                                <span>华丽</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="generateBtn" class="generate-btn">
+                    <i class="fas fa-magic"></i>
+                    <span>开始生成小说</span>
+                    <div class="btn-particles"></div>
+                </button>
+            </div>
+
+            <!-- 生成进度部分 -->
+            <div class="progress-section" style="display: none;">
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill"></div>
+                    </div>
+                    <div class="progress-percentage">0%</div>
+                </div>
+                <div class="step-indicator">
+                    <div class="step active">
+                        <i class="fas fa-globe"></i>
+                        <span>世界观</span>
+                    </div>
+                    <div class="step">
+                        <i class="fas fa-users"></i>
+                        <span>人物</span>
+                    </div>
+                    <div class="step">
+                        <i class="fas fa-sitemap"></i>
+                        <span>大纲</span>
+                    </div>
+                    <div class="step">
+                        <i class="fas fa-pen-fancy"></i>
+                        <span>章节</span>
+                    </div>
+                    <div class="step">
+                        <i class="fas fa-paint-brush"></i>
+                        <span>润色</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 加载动画 -->
+            <div class="loading-section" style="display: none;">
+                <div class="ai-thinking">
+                    <div class="thinking-dots">
+                        <div></div>
+                        <div></div>
+                        <div></div>
+                    </div>
+                </div>
+                <p class="loading-text">AI正在创作中...</p>
+                <div class="generation-status"></div>
+            </div>
+
+            <!-- 结果展示部分 -->
+            <div class="result-section">
+                <!-- 设定展示区 -->
+                <div class="settings-panel" style="display: none;">
+                    <div class="panel">
+                        <h3><i class="fas fa-globe"></i> 世界观设定</h3>
+                        <div id="worldSettings" class="panel-content"></div>
+                    </div>
+                    <div class="panel">
+                        <h3><i class="fas fa-users"></i> 人物设定</h3>
+                        <div id="characterSettings" class="panel-content"></div>
+                    </div>
+                    <div class="panel">
+                        <h3><i class="fas fa-sitemap"></i> 故事大纲</h3>
+                        <div id="storyOutline" class="panel-content"></div>
+                    </div>
+                </div>
+
+                <!-- 小说内容展示区 -->
+                <div id="novelContent" class="novel-content"></div>
+                
+                <!-- 操作按钮 -->
+                <div class="action-buttons" style="display: none;">
+                    <button id="toggleSettingsBtn" class="secondary-btn">
+                        <i class="fas fa-cog"></i>
+                        <span>显示/隐藏设定</span>
+                    </button>
+                    <button id="downloadBtn" class="download-btn">
+                        <i class="fas fa-download"></i>
+                        <span>下载小说</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- AI状态面板 -->
+            <div class="ai-stats">
+                <div class="stat">
+                    <i class="fas fa-book-open"></i>
+                    <span class="stat-value">0</span>
+                    <span class="stat-label">已生成章节</span>
+                </div>
+                <div class="stat">
+                    <i class="fas fa-font"></i>
+                    <span class="stat-value">0</span>
+                    <span class="stat-label">总字数</span>
+                </div>
+                <div class="stat">
+                    <i class="fas fa-clock"></i>
+                    <span class="stat-value">00:00</span>
+                    <span class="stat-label">生成时间</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html> 
